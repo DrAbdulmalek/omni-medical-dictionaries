@@ -1,0 +1,27 @@
+# ============================================================
+# requirements-scanner.txt — OmniFile Processor / Scanner Fixer v2.1
+# Manjaro-ready dependencies
+# ============================================================
+
+# --- Core ---
+gradio>=4.0.0
+numpy>=1.24.0
+Pillow>=10.0.0
+opencv-python-headless>=4.8.0
+
+# --- OCR & Rotation Detection ---
+pytesseract>=0.3.10
+
+# --- PDF Support ---
+pdf2image>=1.16.0
+
+# --- System packages (Manjaro / Arch) ---
+# Run these BEFORE pip install:
+#   sudo pacman -S python-opencv tesseract poppler
+#
+# Or on Ubuntu/Debian:
+#   sudo apt install libgl1 libglib2.0-0 tesseract-ocr poppler-utils
+#
+# For Arabic OCR support:
+#   sudo pacman -S tesseract-data-ara tesseract-data-eng
+#   # or: sudo apt install tesseract-ocr-ara tesseract-ocr-eng
