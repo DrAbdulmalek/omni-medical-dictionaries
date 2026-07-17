@@ -1,4 +1,4 @@
-# OmniFile Medical Suite
+# Omni Medical Suite
 
 Smart scanner image correction + Archive.org book downloader + bilingual medical glossary extraction.
 
@@ -16,6 +16,7 @@ Smart scanner image correction + Archive.org book downloader + bilingual medical
 
 ### Archive.org Book Downloader
 - IIIF API page download (no browser needed)
+- Selenium fallback for protected books
 - Skip-if-exists for resumable downloads
 - Scanner fix applied before OCR
 - SQLite storage with `verified` flag for review workflow
@@ -30,7 +31,29 @@ Smart scanner image correction + Archive.org book downloader + bilingual medical
 - Language detection (Arabic ratio > 0.3)
 - Confidence-based deduplication
 
+### Tampermonkey Script (Bonus)
+- Fast browser-based download of borrowed Archive.org books
+- 300ms per page (~2-3 min for 282 pages)
+- See `scripts/archive-downloader.user.js`
+
 ## Quick Start (Manjaro)
+
+```bash
+# Clone
+git clone https://github.com/DrAbdulmalek/omni-medical-suite.git
+cd omni-medical-suite
+
+# One-script setup
+chmod +x setup_all.sh
+./setup_all.sh
+
+# Run
+source venv/bin/activate
+python app/advanced_review_app.py
+# Open http://localhost:7860
+```
+
+### Manual Setup
 
 ```bash
 # System packages
@@ -39,51 +62,87 @@ sudo pacman -S python-opencv tesseract poppler tesseract-data-ara tesseract-data
 # Python
 python -m venv venv
 source venv/bin/activate
-pip install -r requirements-scanner.txt
+pip install -r requirements.txt
 
-# Run Scanner Fixer UI
+# Run
 python app/advanced_review_app.py
-# Open http://localhost:7860
+```
+
+### Ubuntu/Debian
+
+```bash
+sudo apt install libgl1 libglib2.0-0 tesseract-ocr tesseract-ocr-ara tesseract-ocr-eng poppler-utils
+python -m venv venv && source venv/bin/activate
+pip install -r requirements.txt
+python app/advanced_review_app.py
 ```
 
 ## Download a Book from Archive.org
 
+### Option A: Tampermonkey (Fastest — 300ms/page)
+1. Install [Tampermonkey](https://chrome.google.com/webstore/detail/tampermonkey/dhdgffkkebhmkfjojejmpbldmpobfkfo)
+2. Copy `scripts/archive-downloader.user.js` into a new Tampermonkey script
+3. Open the book on Archive.org, borrow it, click the orange START DOWNLOAD button
+
+### Option B: Python CLI
 ```bash
-python -m packages.collectors.archive_book_downloader \
-    --book-id hittisnewmedical0000hitt \
-    --output ./hitti_output \
-    --pages 850 \
-    --lang eng+ara
+python scripts/archive_book_extractor.py \
+    --url "https://archive.org/details/hittisnewmedical0000hitt" \
+    --email your_email@archive.org \
+    --password your_password \
+    --start-page 1 --end-page 50
 ```
 
-## One-Script Setup
+### Option C: Gradio UI (Tab 3)
+Open http://localhost:7860, go to "Archive Extractor" tab, fill in details, click Start.
 
-```bash
-chmod +x setup.sh
-./setup.sh
-```
+## Google Colab
+
+Open `colab/Omni_Hitti_Complete_Colab.ipynb` in Google Colab and run all cells.
 
 ## Project Structure
 
 ```
 omni-medical-suite/
   app/
-    advanced_review_app.py            # Gradio UI (Scanner Fixer)
+    advanced_review_app.py            # Main Gradio UI (4 tabs, port 7860)
+    hitti_glossary_app.py             # Standalone glossary builder (port 7861)
+    hf_space_app.py                   # HF Space: 5 OCR models
   packages/
     preprocessors/
       scanner_fixer.py                # Core engine v2.1
     ocr/
-      ocr_engine.py                   # Multi-engine OCR (Tesseract + EasyOCR + PaddleOCR)
+      ocr_engine.py                   # Multi-engine OCR
     collectors/
-      archive_book_downloader.py      # Archive.org IIIF downloader + glossary extraction
-      glossary_parser.py             # 7-pattern bilingual glossary parser
-  data/                              # Runtime data (glossaries, DBs)
-  logs/                              # Runtime logs
-  downloads/                         # User-saved files
-  setup.sh                           # One-script installer
-  requirements-scanner.txt           # Python deps
-  IDEAS.md                           # Development roadmap & ideas
-  STATE_OF_TRUTH.md                  # Architecture & status
+      archive_book_downloader.py      # Archive.org IIIF downloader
+      glossary_parser.py              # 7-pattern glossary parser
+  scripts/
+    archive_book_extractor.py         # CLI v2.0 (IIIF + Selenium + Manual)
+    archive-downloader.user.js        # Tampermonkey script v3.6
+  tests/
+    test_scanner_fixer.py             # Unit tests (pytest)
+  colab/
+    Omni_Hitti_Complete_Colab.ipynb   # Google Colab notebook
+  data/                               # Runtime databases
+  logs/                               # Runtime logs
+  downloads/                          # User-saved files
+  setup.sh                            # Scanner-only installer
+  setup_all.sh                        # Full installer (Manjaro)
+  setup_manjaro.sh                    # Simple Manjaro setup
+  requirements.txt                    # Complete Python deps
+  requirements-scanner.txt            # Scanner-only Python deps
+  requirements-hf.txt                 # HF Space deps
+  packages.txt                        # HF Space system deps
+  DEPLOY_GUIDE.md                     # HF Space deployment guide
+  STATE_OF_TRUTH.md                   # Architecture & status
+  IDEAS.md                            # Development roadmap
+```
+
+## Running Tests
+
+```bash
+pip install pytest
+python -m pytest tests/ -v
 ```
 
 ## Sources & Inspiration

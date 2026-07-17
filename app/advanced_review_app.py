@@ -1,15 +1,17 @@
 #!/usr/bin/env python3
 """
-advanced_review_app.py — OmniFile_Processor / omni-medical-suite
-===============================================================
-Gradio application with full "Scanner Fixer" tab.
+advanced_review_app.py — Omni Medical Suite
+=============================================
+Gradio application with Scanner Fixer + Archive Extractor + Glossary Builder.
 
 Tabs:
   1. Single Image — Before/After preview (gr.State) + manual save only
   2. Batch Mode — PDF + Folder + random preview + Save All as ZIP
+  3. Archive Extractor — Download from Archive.org + OCR + glossary extraction
+  4. Glossary Search — Search & export extracted medical terms
 
-Author: Z.ai
-Updated: 2026-07-17
+Author: DrAbdulmalek / Z.ai
+Updated: 2026-07-18
 """
 
 import os
@@ -332,6 +334,135 @@ def batch_save_zip(state: dict) -> Tuple:
 
 
 # ===========================================================================
+# ARCHIVE EXTRACTOR CALLBACKS
+# ===========================================================================
+
+GLOSSARY_DIR = PROJECT_ROOT / "glossary_output"
+GLOSSARY_DB = GLOSSARY_DIR / "hitti_glossary.db"
+
+
+def _init_glossary_db():
+    """Ensure the glossary database exists."""
+    import sqlite3
+    GLOSSARY_DIR.mkdir(parents=True, exist_ok=True)
+    conn = sqlite3.connect(GLOSSARY_DB)
+    c = conn.cursor()
+    c.execute("""CREATE TABLE IF NOT EXISTS en_ar_glossary (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        english_term TEXT NOT NULL, arabic_term TEXT,
+        page_num INTEGER, context TEXT,
+        confidence REAL DEFAULT 0.0, verified INTEGER DEFAULT 0,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )""")
+    c.execute("""CREATE TABLE IF NOT EXISTS ar_en_glossary (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        arabic_term TEXT NOT NULL, english_term TEXT,
+        page_num INTEGER, context TEXT,
+        confidence REAL DEFAULT 0.0, verified INTEGER DEFAULT 0,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )""")
+    conn.commit()
+    conn.close()
+
+
+def archive_extract(url, email, password, start_page, end_page, mode, delay):
+    """Run Archive.org book extraction."""
+    try:
+        _init_glossary_db()
+        scripts_path = PROJECT_ROOT / "scripts"
+        sys.path.insert(0, str(scripts_path))
+        from archive_book_extractor import ArchiveBookExtractor
+
+        output_dir = str(GLOSSARY_DIR)
+        extractor = ArchiveBookExtractor(
+            email=email, password=password,
+            output_dir=output_dir, mode=mode,
+            delay=float(delay),
+        )
+        success = extractor.run(
+            book_url=url,
+            start_page=int(start_page),
+            end_page=int(end_page) if end_page else None,
+        )
+        if success:
+            return f"Extraction complete. Use the 'Glossary Search' tab to browse results."
+        return "Extraction failed. Check logs/extractor.log for details."
+    except ImportError as exc:
+        return f"Missing dependency: {exc}. Install with: pip install requests selenium webdriver-manager"
+    except Exception as exc:
+        logger.error("archive_extract error: %s", exc)
+        return f"Error: {exc}"
+
+
+def glossary_search(query, direction):
+    """Search the glossary database."""
+    import sqlite3
+    try:
+        _init_glossary_db()
+        conn = sqlite3.connect(GLOSSARY_DB)
+        cursor = conn.cursor()
+        if direction == "en->ar":
+            cursor.execute(
+                "SELECT english_term, arabic_term, page_num, confidence "
+                "FROM en_ar_glossary WHERE english_term LIKE ? ORDER BY english_term LIMIT 100",
+                (f"%{query}%",),
+            )
+        else:
+            cursor.execute(
+                "SELECT arabic_term, english_term, page_num, confidence "
+                "FROM ar_en_glossary WHERE arabic_term LIKE ? ORDER BY arabic_term LIMIT 100",
+                (f"%{query}%",),
+            )
+        rows = cursor.fetchall()
+        conn.close()
+        if not rows:
+            return "No results found. Try extracting a book first."
+        lines = []
+        for term1, term2, page, conf in rows:
+            conf_str = f"[{conf:.1f}]" if conf else ""
+            lines.append(f"{term1:<30} -> {term2:<30} | p.{page} {conf_str}")
+        return "\n".join(lines)
+    except Exception as exc:
+        return f"Error: {exc}"
+
+
+def glossary_stats():
+    """Get glossary statistics."""
+    import sqlite3
+    try:
+        _init_glossary_db()
+        conn = sqlite3.connect(GLOSSARY_DB)
+        en_ar = conn.execute("SELECT COUNT(*) FROM en_ar_glossary").fetchone()[0]
+        ar_en = conn.execute("SELECT COUNT(*) FROM ar_en_glossary").fetchone()[0]
+        conn.close()
+        return (
+            f"English -> Arabic: {en_ar} entries\n"
+            f"Arabic -> English: {ar_en} entries\n"
+            f"Total: {en_ar + ar_en} entries\n"
+            f"Database: {GLOSSARY_DB}"
+        )
+    except Exception as exc:
+        return f"Error: {exc}"
+
+
+def glossary_export_zip():
+    """Export all glossary data as a ZIP file."""
+    import sqlite3, zipfile
+    try:
+        zip_path = GLOSSARY_DIR / "hitti_glossary_export.zip"
+        with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zf:
+            for f in (GLOSSARY_DIR / "glossary").glob("*"):
+                if f.is_file():
+                    zf.write(f, f.name)
+            if GLOSSARY_DB.exists():
+                zf.write(GLOSSARY_DB, "hitti_glossary.db")
+        return str(zip_path)
+    except Exception as exc:
+        logger.error("glossary_export_zip error: %s", exc)
+        return f"Error: {exc}"
+
+
+# ===========================================================================
 # BUILD THE APP
 # ===========================================================================
 
@@ -339,7 +470,7 @@ def build_app() -> gr.Blocks:
     """Construct and return the Gradio application."""
 
     with gr.Blocks(
-        title="OmniFile Processor — Scanner Fixer",
+        title="Omni Medical Suite — Scanner Fixer + Glossary Builder",
         theme=gr.themes.Soft(primary_hue="blue", secondary_hue="green"),
         css="""
             .before-after-row { display: flex; gap: 16px; justify-content: center; }
@@ -349,9 +480,8 @@ def build_app() -> gr.Blocks:
     ) as app:
 
         gr.Markdown(
-            "# OmniFile Processor — Scanner Fixer v2.1\n"
-            "Smart image correction for scanned documents. "
-            "Auto-rotate, deskew, denoise, sharpen, contrast fix, border removal.\n"
+            "# Omni Medical Suite\n"
+            "Smart scanner image correction + Archive.org glossary builder\n"
             "**Manual save only** — your files are not saved until you click Save."
         )
 
@@ -553,13 +683,92 @@ def build_app() -> gr.Blocks:
             )
 
         # ===================================================================
+        # TAB 3: ARCHIVE EXTRACTOR
+        # ===================================================================
+        with gr.Tab("Archive Extractor"):
+            gr.Markdown(
+                "### Extract pages from Archive.org books\n"
+                "Uses IIIF API to download pages, then runs OCR + glossary extraction.\n"
+                "Book must be borrowable on Archive.org."
+            )
+            with gr.Row():
+                archive_url = gr.Textbox(
+                    label="Book URL",
+                    value="https://archive.org/details/hittisnewmedical0000hitt",
+                    scale=3,
+                )
+                archive_mode = gr.Dropdown(
+                    ["iiif", "selenium", "manual"],
+                    value="iiif",
+                    label="Mode",
+                    scale=1,
+                )
+            with gr.Row():
+                archive_email = gr.Textbox(label="Email", type="password", scale=1)
+                archive_password = gr.Textbox(label="Password", type="password", scale=1)
+            with gr.Row():
+                archive_start = gr.Number(label="Start Page", value=1, scale=1)
+                archive_end = gr.Number(label="End Page", value=50, scale=1)
+                archive_delay = gr.Number(label="Delay (sec)", value=2.5, scale=1)
+            with gr.Row():
+                btn_extract = gr.Button("Start Extraction", variant="primary")
+            archive_status = gr.Textbox(label="Extraction Status", lines=8, interactive=False)
+
+            btn_extract.click(
+                fn=archive_extract,
+                inputs=[archive_url, archive_email, archive_password,
+                        archive_start, archive_end, archive_mode, archive_delay],
+                outputs=[archive_status],
+            )
+
+        # ===================================================================
+        # TAB 4: GLOSSARY SEARCH
+        # ===================================================================
+        with gr.Tab("Glossary Search"):
+            gr.Markdown(
+                "### Search extracted medical glossary\n"
+                "Searches the local SQLite database of extracted terms."
+            )
+            with gr.Row():
+                gloss_query = gr.Textbox(
+                    label="Search Term",
+                    placeholder="e.g. abdominal or بطني",
+                    scale=2,
+                )
+                gloss_dir = gr.Dropdown(
+                    ["en->ar", "ar->en"],
+                    value="en->ar",
+                    label="Direction",
+                    scale=1,
+                )
+                btn_search = gr.Button("Search", variant="primary")
+            gloss_results = gr.Textbox(label="Results", lines=15, interactive=False)
+
+            with gr.Row():
+                btn_stats = gr.Button("Show Statistics")
+            gloss_stats = gr.Textbox(label="Statistics", interactive=False)
+
+            with gr.Row():
+                btn_export_zip = gr.Button("Export All as ZIP", variant="secondary")
+                gloss_zip = gr.File(label="Download ZIP")
+
+            btn_search.click(
+                fn=glossary_search,
+                inputs=[gloss_query, gloss_dir],
+                outputs=[gloss_results],
+            )
+            btn_stats.click(fn=glossary_stats, outputs=[gloss_stats])
+            btn_export_zip.click(fn=glossary_export_zip, outputs=[gloss_zip])
+
+        # ===================================================================
         # FOOTER
         # ===================================================================
         gr.Markdown(
             "---\n"
-            "OmniFile Processor | Scanner Fixer v2.1 | "
+            "Omni Medical Suite | Scanner Fixer v2.1 + Glossary Builder | "
             "Engine: Tesseract OSD + Hough + Projection Profile | "
-            "Manjaro-ready"
+            "Manjaro-ready | "
+            "[Tampermonkey Script](scripts/archive-downloader.user.js) for fast downloads"
         )
 
     return app
