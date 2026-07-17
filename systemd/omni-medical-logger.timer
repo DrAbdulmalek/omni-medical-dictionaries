@@ -1,0 +1,11 @@
+[Unit]
+Description=Omni Medical Suite - Periodic Logger Timer
+Documentation=https://github.com/DrAbdulmalek/omni-medical-suite
+
+[Timer]
+OnBootSec=5min
+OnUnitActiveSec=15min
+AccuracySec=1min
+
+[Install]
+WantedBy=timers.target

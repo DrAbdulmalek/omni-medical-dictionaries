@@ -1,0 +1,14 @@
+[Unit]
+Description=Omni Medical Suite - Periodic Performance Logger
+Documentation=https://github.com/DrAbdulmalek/omni-medical-suite
+After=network.target
+
+[Service]
+Type=oneshot
+User=%i
+WorkingDirectory=%h/omni-medical-suite
+Environment="PATH=%h/omni-medical-suite/venv/bin:/usr/bin"
+Environment="PYTHONPATH=%h/omni-medical-suite"
+ExecStart=%h/omni-medical-suite/venv/bin/python -c "from scripts.advanced_logger import get_feedback_collector; fb=get_feedback_collector(); fb.performance_monitor.log_metrics()"
+StandardOutput=journal
+StandardError=journal
