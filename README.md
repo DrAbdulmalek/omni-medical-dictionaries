@@ -1,3 +1,17 @@
+> [!IMPORTANT]
+> **📦 أُرشف هذا المستودع بالكامل خارج GitHub** — النسخة الكاملة (الشيفرة + تاريخ git كامل + جميع الفروع) محفوظة في:
+>
+> | الوجهة | المسار |
+> |---|---|
+> | 🤗 Hugging Face Bucket | [`DrAbdulmalek/github-repo-backups`](https://huggingface.co/buckets/DrAbdulmalek/github-repo-backups) — الملف: `2026-10-14/omni-medical-dictionaries_2026-10-14.tar.gz` (2.15 GB) *(خاص — يتطلب توكن HF)* |
+> | 📁 Google Drive | `github-repo-backups/2026-10-14/omni-medical-dictionaries_2026-10-14.tar.gz` |
+>
+> **SHA256**: `a21dd0674e7edd616423a0cd456967b1502fb14488b9a90dfe9cfcca97ce18ea`
+> **آخر كومِت مُؤرشف**: `a4112f5636e8` — 2026-08-02T22:37:58Z — "Add Python CI workflow"
+>
+> للاستعادة راجع `RESTORE.md` داخل الـ Bucket. *تاريخ الأرشفة: 2026-10-14 — هذا المستودع أُرشف كاملاً.*
+
+
 # Omni Medical Suite
 
 Smart scanner image correction + Archive.org book downloader + bilingual medical glossary extraction.
