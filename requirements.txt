@@ -23,7 +23,7 @@ img2pdf>=0.4.4
 # --- Archive.org Extraction ---
 requests>=2.31.0
 selenium>=4.15.0
-webdriver-manager>=4.0.0
+webdriver-manager>=4.1.2
 
 # --- Data Export ---
 csvkit>=1.0.7
