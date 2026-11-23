@@ -13,7 +13,7 @@ opencv-python-headless>=5.1.0.95
 pytesseract>=0.3.10
 
 # --- PDF Support ---
-pdf2image>=1.16.0
+pdf2image>=1.17.0
 
 # --- System packages (Manjaro / Arch) ---
 # Run these BEFORE pip install:
